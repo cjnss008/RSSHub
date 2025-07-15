@@ -1,8 +1,7 @@
 """
-title: 自动分页 Filter
-author: OpenWebUI Contributor
+title: 自动分页 Auto Pagination Filter
+author: your_name_or_team
 version: 0.1.0
-description: 在请求中注入分页参数，响应中附加游标，实现对话自动分页。
 required_open_webui_version: 0.4.3
 license: MIT
 """
@@ -15,15 +14,12 @@ class Pipeline:
     class Valves(BaseModel):
         pipelines: List[str] = Field(
             default=["*"],
-            description="适用于哪些 pipeline（模型）；* 表示全部"
+            description="应用该分页过滤器的 pipeline 列表，* 表示全部适用"
         )
         PAGE_SIZE: int = Field(
             default=50,
-            description="每次拉取的消息数"
+            description="每次拉取的历史消息条数"
         )
-
-    class UserValves(BaseModel):
-        pass  # 无用户侧配置
 
     def __init__(self):
         self.id = "auto_pagination"
@@ -31,7 +27,18 @@ class Pipeline:
         self.type = "filter"
         self.valves = self.Valves()
 
+    async def on_startup(self):
+        # 可选：服务启动时执行
+        pass
+
+    async def on_shutdown(self):
+        # 可选：服务关闭时执行
+        pass
+
     async def inlet(self, body: dict, user: Optional[dict] = None) -> dict:
+        """
+        在请求发送到模型前注入 limit、before 参数
+        """
         if body.get("endpoint", "").endswith("/chat/completions"):
             payload = body.setdefault("json", {})
             payload["limit"] = self.valves.PAGE_SIZE
@@ -39,9 +46,11 @@ class Pipeline:
         return body
 
     async def outlet(self, response: dict, user: Optional[dict] = None) -> dict:
-        messages = response.get("messages", [])
-        if messages:
-            cursor = messages[0].get("id") or messages[0].get("timestamp")
-            if cursor:
-                response.setdefault("pagination", {})["next_before"] = cursor
+        """
+        在模型响应中追加分页游标（next_before）
+        """
+        msgs = response.get("messages", [])
+        if msgs:
+            next_before = msgs[0].get("id") or msgs[0].get("timestamp")
+            response.setdefault("pagination", {})["next_before"] = next_before
         return response
