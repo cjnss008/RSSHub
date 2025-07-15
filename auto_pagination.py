@@ -22,8 +22,8 @@ class Pipeline:
 
     def __init__(self):
         self.id = "auto_pagination"
-        self.name = "自动分页 Filter"
-        self.type = "filter"
+        self.name = "自动分页"
+        self.type = "manifold"
         self.valves = self.Valves()
 
     async def inlet(self, body: dict, user: Optional[dict] = None) -> dict:
