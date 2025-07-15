@@ -23,13 +23,10 @@ class Pipeline:
     def __init__(self):
         self.id = "auto_pagination"
         self.name = "自动分页"
-        self.type = "manifold"
+        self.type = "filter"  # ✅ 使用 filter 而不是 manifold
         self.valves = self.Valves()
 
     async def inlet(self, body: dict, user: Optional[dict] = None) -> dict:
-        """
-        在请求发送前插入分页参数
-        """
         if body.get("endpoint", "").endswith("/chat/completions"):
             payload = body.setdefault("json", {})
             payload["limit"] = self.valves.PAGE_SIZE
@@ -37,9 +34,6 @@ class Pipeline:
         return body
 
     async def outlet(self, response: dict, user: Optional[dict] = None) -> dict:
-        """
-        响应中附加下一页游标
-        """
         msgs = response.get("messages", [])
         if msgs:
             next_before = msgs[0].get("id") or msgs[0].get("timestamp")
