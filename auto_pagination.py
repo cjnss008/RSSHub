@@ -1,56 +1,48 @@
 """
-title: 自动分页 Auto Pagination Filter
-author: your_name_or_team
+title: 自动分页模拟模型
+author: ChatGPT
 version: 0.1.0
 required_open_webui_version: 0.4.3
 license: MIT
 """
 
-from typing import List, Optional
+from typing import List, Union, Iterator
 from pydantic import BaseModel, Field
-
+import json
 
 class Pipeline:
     class Valves(BaseModel):
-        pipelines: List[str] = Field(
-            default=["*"],
-            description="应用该分页过滤器的 pipeline 列表，* 表示全部适用"
-        )
-        PAGE_SIZE: int = Field(
-            default=50,
-            description="每次拉取的历史消息条数"
-        )
+        PAGE_SIZE: int = Field(default=50, description="每页消息条数")
 
     def __init__(self):
-        self.id = "auto_pagination"
-        self.name = "自动分页"
-        self.type = "filter"
+        self.id = "auto_pagination_model"
+        self.name = "自动分页模拟模型"
+        self.type = "manifold"
         self.valves = self.Valves()
 
-    async def on_startup(self):
-        # 可选：服务启动时执行
-        pass
+    def pipes(self) -> List[dict]:
+        return [{"id": self.id, "name": self.name}]
 
-    async def on_shutdown(self):
-        # 可选：服务关闭时执行
-        pass
+    def pipe(
+        self,
+        user_message: str,
+        model_id: str,
+        messages: List[dict],
+        body: dict
+    ) -> Union[str, Iterator[str]]:
+        try:
+            limit = self.valves.PAGE_SIZE
+            before = body.get("before", None)
 
-    async def inlet(self, body: dict, user: Optional[dict] = None) -> dict:
-        """
-        在请求发送到模型前注入 limit、before 参数
-        """
-        if body.get("endpoint", "").endswith("/chat/completions"):
-            payload = body.setdefault("json", {})
-            payload["limit"] = self.valves.PAGE_SIZE
-            payload.setdefault("before", None)
-        return body
+            # 模拟从已有历史中“分页提取”
+            paged = messages[-limit:] if len(messages) > limit else messages
 
-    async def outlet(self, response: dict, user: Optional[dict] = None) -> dict:
-        """
-        在模型响应中追加分页游标（next_before）
-        """
-        msgs = response.get("messages", [])
-        if msgs:
-            next_before = msgs[0].get("id") or msgs[0].get("timestamp")
-            response.setdefault("pagination", {})["next_before"] = next_before
-        return response
+            result = {
+                "summary": f"当前总消息数：{len(messages)}，本页返回：{len(paged)}条",
+                "分页游标（模拟before）": messages[-(limit+1)]["id"] if len(messages) > limit else None,
+                "本页内容": paged
+            }
+            return json.dumps(result, ensure_ascii=False, indent=2)
+
+        except Exception as e:
+            return f"发生错误: {e}"
